@@ -3,8 +3,6 @@ Allow players to spawn two kinds of Rust toilet (A or B).
 
 CanBuild is checked to prevent spawning in range of a TC where the player is not authenticated, at monuments, etc.
 
-WORK IN PROGRESS BUT SHOULD BE READY...
-
 ## Command
  - toil {CHOICE} -- If /toil is run with no options, type A will be spawned.  If /toil b is run, type B will be spawned.
  - toil remove -- Removes the toilet they are looking at, if they have permission.  Admin can also remove a toilet.

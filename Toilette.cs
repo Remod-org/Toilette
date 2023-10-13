@@ -30,7 +30,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Toilette", "RFC1920", "1.0.2")]
+    [Info("Toilette", "RFC1920", "1.0.3")]
     [Description("Spawn a toilet!")]
     internal class Toilette : RustPlugin
     {
@@ -113,10 +113,10 @@ namespace Oxide.Plugins
                 return;
             }
 
-            foreach (KeyValuePair<ulong, List<Toilet>> toiletA in toilettes)
+            foreach (KeyValuePair<ulong, List<Toilet>> toilets in toilettes)
             {
-                if (userid > 0 && toiletA.Key != userid) continue;
-                foreach (Toilet toilet in toiletA.Value)
+                if (userid > 0 && toilets.Key != userid) continue;
+                foreach (Toilet toilet in toilets.Value)
                 {
                     BaseNetworkable t = BaseNetworkable.serverEntities.Find(toilet.Id);
                     if (t == null) continue;
@@ -162,6 +162,8 @@ namespace Oxide.Plugins
 
                 if (!friend && !player.IsAdmin) return;
                 target.Kill();
+                toilettes[player.userID].Remove(find);
+                SaveData();
                 return;
             }
             if (player.IsAdmin && args.Length == 1 && string.Equals(args[0], "killall", StringComparison.OrdinalIgnoreCase))
@@ -198,13 +200,18 @@ namespace Oxide.Plugins
                 return;
             }
 
-            Quaternion rotation = player.GetNetworkRotation();
+            Quaternion rotation;
+            TryGetPlayerView(player, out rotation);
             Vector3 forward = rotation * Vector3.forward;
+            rotation.x = 0f;
+            rotation.z = 0f;
             // Make straight perpendicular to up axis so we don't spawn into ground or above player's head.
             Vector3 straight = Vector3.Cross(Vector3.Cross(Vector3.up, forward), Vector3.up).normalized;
-            Vector3 position = player.transform.position + (straight * 5f);
+            Vector3 position = player.transform.position + straight;// * 1f);
             //position.y = TerrainMeta.HeightMap.GetHeight(position);
-            GameObject prefab = SpawnPrefab(pre, position + new Vector3(2, 0, 0), rotation, true);
+            // Euler rotates it 180 so it faces us.
+            GameObject prefab = SpawnPrefab(pre, position, rotation * Quaternion.Euler(0f, 180f, 0f), true);
+            prefab.transform.rotation.SetFromToRotation(prefab.transform.position, Vector3.up);
 
             if (prefab == null) return;
 
@@ -224,7 +231,7 @@ namespace Oxide.Plugins
                 Name = player.name,
                 prefab = pre,
                 position = position,
-                rotation = rotation
+                rotation = rotation * Quaternion.Euler(0f, 180f, 0f)
             });
             toiletToOwner.Add(entity.net.ID, player.userID);
             SaveData();
@@ -250,6 +257,17 @@ namespace Oxide.Plugins
         }
 
         // From Build.cs
+        private static bool TryGetPlayerView(BasePlayer player, out Quaternion viewAngle)
+        {
+            viewAngle = Quaternion.identity;
+
+            if (player.serverInput.current == null) return false;
+
+            viewAngle = Quaternion.Euler(player.serverInput.current.aimAngles);
+
+            return true;
+        }
+
         private static GameObject SpawnPrefab(string prefabname, Vector3 pos, Quaternion angles, bool active)
         {
             GameObject prefab = GameManager.server.CreatePrefab(prefabname, pos, angles, active);
