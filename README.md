@@ -2,6 +2,7 @@
 Allow players to spawn two kinds of Rust toilet (A or B).
 
 ![](https://github.com/Remod-org/Toilette/blob/3665b7fbfa850fffebe204845f5143d84189b040/toilette.jpg)
+Type A Toilet
 
 CanBuild is checked to prevent spawning in range of a TC where the player is not authenticated, at monuments, etc.
 
