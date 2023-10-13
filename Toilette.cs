@@ -30,7 +30,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Toilette", "RFC1920", "1.0.1")]
+    [Info("Toilette", "RFC1920", "1.0.2")]
     [Description("Spawn a toilet!")]
     internal class Toilette : RustPlugin
     {
@@ -61,6 +61,23 @@ namespace Oxide.Plugins
             LoadConfigVariables();
             LoadData();
             RespawnToilets();
+        }
+
+        #region Message
+        private string Lang(string key, string id = null, params object[] args) => string.Format(lang.GetMessage(key, this, id), args);
+        private void Message(IPlayer player, string key, params object[] args) => player.Reply(Lang(key, player.Id, args));
+        #endregion
+
+        protected override void LoadDefaultMessages()
+        {
+            lang.RegisterMessages(new Dictionary<string, string>
+            {
+                ["noperm"] = "No toilets for you!",
+                ["notours"] = "Invalid toilet - not in database.",
+                ["nobuild"] = "Can't build here.",
+                ["notc"] = "Must be in range of an authed TC.",
+                ["atlimit"] = "No more toilets for you!"
+            }, this);
         }
 
         private void Unload() => KillToilets();
@@ -114,7 +131,7 @@ namespace Oxide.Plugins
         private void cmdToil(IPlayer iplayer, string command, string[] args)
         {
             BasePlayer player = iplayer.Object as BasePlayer;
-            if (configData.Options.RequirePermission && !iplayer.HasPermission(permUse) && !player.IsAdmin) { SendReply(player, "No toilets for you!"); return; }
+            if (configData.Options.RequirePermission && !iplayer.HasPermission(permUse) && !player.IsAdmin) { Message(iplayer, "noperm"); return; }
 
             string pre = prefabA;
             if (args.Length == 1 && string.Equals(args[0], "b", StringComparison.OrdinalIgnoreCase))
@@ -131,7 +148,7 @@ namespace Oxide.Plugins
                 Toilet find = toilettes[player.userID].First(x => x.Id == target.net.ID);
                 if (find == null)
                 {
-                    SendReply(player, "Invalid toilet - not in database.");
+                    Message(iplayer, "notours");
                     return;
                 }
 
@@ -165,19 +182,19 @@ namespace Oxide.Plugins
             // Building Privilege checks
             if (!player.CanBuild() && !player.IsAdmin)
             {
-                SendReply(player, "Can't build here.");
+                Message(iplayer, "nobuild");
                 return;
             }
             if (player.GetBuildingPrivilege() == null && configData.Options.RequireTC)
             {
-                SendReply(player, "Must be in range of an authed TC.");
+                Message(iplayer, "notc");
                 return;
             }
 
             // Limit check
             if (toilettes.ContainsKey(player.userID) && configData.Options.tLimit > 0 && toilettes[player.userID].Count >= configData.Options.tLimit)
             {
-                SendReply(player, "No more toilets for you!");
+                Message(iplayer, "atlimit");
                 return;
             }
 
