@@ -30,7 +30,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Toilette", "RFC1920", "1.0.3")]
+    [Info("Toilette", "RFC1920", "1.0.4")]
     [Description("Spawn a toilet!")]
     internal class Toilette : RustPlugin
     {
@@ -82,6 +82,34 @@ namespace Oxide.Plugins
 
         private void Unload() => KillToilets();
 
+        private object CanMountEntity(BasePlayer player, BaseMountable mountable)
+        {
+            if (player == null) return null;
+            if (mountable == null) return null;
+            // Only toilets
+            if (!mountable.ShortPrefabName.Equals("toilet_a.static") && !mountable.ShortPrefabName.Equals("toilet_b.static")) return null;
+            DoLog($"Toilet ID: {mountable.net.ID.Value}", 2);
+            DoLog($"Owner ID: {mountable.OwnerID}", 2);
+            // Only toilets we manage
+            //if (mountable.OwnerID == 0 || toiletToOwner.ContainsKey(mountable.net.ID))
+            if (mountable.OwnerID == 0 || !toilettes.ContainsKey(mountable.OwnerID))
+            {
+                DoLog("Not a managed toilet.");
+                return null;
+            }
+            DoLog("Managed toilet");
+
+            object res = IsFriend(player.userID, mountable.net.ID.Value);
+            if (res is bool && !(bool)res && configData.Options.BlockMount)
+            {
+                // Block mount
+                DoLog("Player trying to mount someone else's toilet.");
+                return true;
+            }
+            DoLog("Player can mount this toilet.");
+            return null;
+        }
+
         private void RespawnToilets()
         {
             foreach (KeyValuePair<ulong, List<Toilet>> toilets in new Dictionary<ulong, List<Toilet>>(toilettes))
@@ -106,6 +134,25 @@ namespace Oxide.Plugins
 
         private void KillToilets(bool all = false, ulong userid = 0)
         {
+            foreach (KeyValuePair<ulong, List<Toilet>> toilets in new Dictionary<ulong, List<Toilet>>(toilettes))
+            {
+                if (userid > 0 && toilets.Key != userid) continue;
+                foreach (Toilet toilet in toilets.Value)
+                {
+                    BaseNetworkable t = BaseNetworkable.serverEntities.Find(toilet.Id);
+                    if (t == null) continue;
+                    Toilet find = toilettes[toilets.Key].First(x => x.Id == toilet.Id);
+                    if (find != null)
+                    {
+                        // Save position in case someone moved it after spawn, e.g. via Telekinesis or Push
+                        find.position = t.transform.position;
+                        find.rotation = t.transform.rotation;
+                    }
+                    t.Kill();
+                    toiletToOwner.Remove(toilet.Id);
+                }
+            }
+
             if (all)
             {
                 toilettes.Clear();
@@ -113,17 +160,6 @@ namespace Oxide.Plugins
                 return;
             }
 
-            foreach (KeyValuePair<ulong, List<Toilet>> toilets in toilettes)
-            {
-                if (userid > 0 && toilets.Key != userid) continue;
-                foreach (Toilet toilet in toilets.Value)
-                {
-                    BaseNetworkable t = BaseNetworkable.serverEntities.Find(toilet.Id);
-                    if (t == null) continue;
-                    t.Kill();
-                    toiletToOwner.Remove(toilet.Id);
-                }
-            }
             SaveData();
         }
 
@@ -142,7 +178,7 @@ namespace Oxide.Plugins
             {
                 BaseEntity target = RaycastAll<BaseEntity>(player.eyes.HeadRay()) as BaseEntity;
                 if (target == null) return;
-                if (!target.ShortPrefabName.Contains("toilet")) return;
+                if (!target.ShortPrefabName.Equals("toilet_a.static") && !target.ShortPrefabName.Equals("toilet_b.static")) return;
 
                 // Defined toilets check
                 Toilet find = toilettes[player.userID].First(x => x.Id == target.net.ID);
@@ -294,7 +330,8 @@ namespace Oxide.Plugins
                     useClans = false,
                     useFriends = false,
                     useTeams = false,
-                    tLimit = 5
+                    tLimit = 5,
+                    BlockMount = false
                 },
                 Version = Version
             };
@@ -328,11 +365,13 @@ namespace Oxide.Plugins
             public bool useTeams;
 
             public float tLimit;
+
+            public bool BlockMount;
         }
 
         private void DoLog(string message, int indent = 0)
         {
-            Debug.LogWarning("".PadLeft(indent, ' ') + message);
+            Debug.LogWarning("".PadLeft(indent, ' ') + "[Toilette] " + message);
         }
 
         #endregion config

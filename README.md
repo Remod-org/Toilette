@@ -21,12 +21,13 @@ CanBuild is checked to prevent spawning in range of a TC where the player is not
     "useFriends": false,
     "useClans": false,
     "useTeams": false,
-    "tLimit": 5.0
+    "tLimit": 5.0,
+	"BlockMount": false
   },
   "Version": {
     "Major": 1,
     "Minor": 0,
-    "Patch": 1
+    "Patch": 4
   }
 }
 ```
@@ -36,13 +37,11 @@ CanBuild is checked to prevent spawning in range of a TC where the player is not
  - `useFriends` -- Use various Friends plugins for determining relationships
  - `useTeams` -- Use Rust native teams for determining relationships
  - `tLimit` -- Per-player toilet limit
+ - `BlockMount` -- If true, only the player or their friends can mount the toilet.
 
 ## Permissions
  - toilette.use -- Required to use the /toil command.  Not required for admins.
 
 ## TODO
- - Add Friends/Teams/Clans support
- - Add configs for useFriends, etc.
- - Optionally require permission to sit on someone else's toilet
- - Set limits and possibly VIP limits
+ - VIP limits
 
