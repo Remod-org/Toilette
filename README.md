@@ -22,7 +22,7 @@ CanBuild is checked to prevent spawning in range of a TC where the player is not
     "useClans": false,
     "useTeams": false,
     "tLimit": 5.0,
-	"BlockMount": false
+    "BlockMount": false
   },
   "Version": {
     "Major": 1,
