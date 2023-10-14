@@ -30,7 +30,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Toilette", "RFC1920", "1.0.5")]
+    [Info("Toilette", "RFC1920", "1.0.6")]
     [Description("Spawn a toilet!")]
     internal class Toilette : RustPlugin
     {
@@ -58,7 +58,18 @@ namespace Oxide.Plugins
         {
             permission.RegisterPermission(permUse, this);
             AddCovalenceCommand("toil", "cmdToil");
+
             LoadConfigVariables();
+            if (configData?.VIPSettings?.Count > 0)
+            {
+                foreach (string vipperm in configData.VIPSettings.Keys)
+                {
+                    string perm = vipperm.StartsWith($"{Name.ToLower()}.") ? vipperm : $"{Name.ToLower()}.{vipperm}";
+                    DoLog($"Registering vip perm {perm}");
+                    permission.RegisterPermission(perm, this);
+                }
+            }
+
             LoadData();
             RespawnToilets();
         }
@@ -218,20 +229,26 @@ namespace Oxide.Plugins
                 return;
             }
 
+            VIPSettings vipsettings;
+            GetVIPSettings(player, out vipsettings);
+            bool BuildAnwhere = vipsettings?.BuildAnywhere ?? configData.Options.BuildAnywhere;
+            bool RequireTC = vipsettings?.RequireTC ?? configData.Options.RequireTC;
+            float tLimit = vipsettings?.tLimit ?? configData.Options.tLimit;
+
             // Building Privilege checks
-            if (!player.CanBuild() && !player.IsAdmin)
+            if (!player.CanBuild() && !BuildAnwhere && !player.IsAdmin)
             {
                 Message(iplayer, "nobuild");
                 return;
             }
-            if (player.GetBuildingPrivilege() == null && configData.Options.RequireTC)
+            if (player.GetBuildingPrivilege() == null && RequireTC)
             {
                 Message(iplayer, "notc");
                 return;
             }
 
             // Limit check
-            if (toilettes.ContainsKey(player.userID) && configData.Options.tLimit > 0 && toilettes[player.userID].Count >= configData.Options.tLimit)
+            if (toilettes.ContainsKey(player.userID) && configData.Options.tLimit > 0 && toilettes[player.userID].Count >= tLimit)
             {
                 Message(iplayer, "atlimit");
                 return;
@@ -342,6 +359,25 @@ namespace Oxide.Plugins
         {
             configData = Config.ReadObject<ConfigData>();
 
+            if (configData.Version < new VersionNumber(1, 0, 6))
+            {
+                configData.VIPSettings = new Dictionary<string, VIPSettings>
+                {
+                    {
+                        "toilette.viplevel1", new VIPSettings()
+                        {
+                            tLimit = 10,
+                            RequireTC = false
+                        }
+                    }
+                };
+            }
+
+            if (configData.VIPSettings == null)
+            {
+                configData.VIPSettings = new Dictionary<string, VIPSettings>();
+            }
+
             configData.Version = Version;
             SaveConfig(configData);
         }
@@ -354,12 +390,14 @@ namespace Oxide.Plugins
         public class ConfigData
         {
             public Options Options = new Options();
+            public Dictionary<string, VIPSettings> VIPSettings { get; set; }
             public VersionNumber Version;
         }
 
         public class Options
         {
             public bool RequirePermission;
+            public bool BuildAnywhere;
             public bool RequireTC;
             public bool useFriends;
             public bool useClans;
@@ -370,9 +408,37 @@ namespace Oxide.Plugins
             public bool BlockMount;
         }
 
+        public class VIPSettings
+        {
+            public bool BuildAnywhere;
+            public bool RequireTC;
+            public float tLimit;
+        }
+
         private void DoLog(string message, int indent = 0)
         {
             Debug.LogWarning("".PadLeft(indent, ' ') + "[Toilette] " + message);
+        }
+
+        private void GetVIPSettings(BasePlayer player, out VIPSettings vipsettings)
+        {
+            if (player?.userID.IsSteamId() != true)
+            {
+                DoLog("User has no VIP settings");
+                vipsettings = null;
+                return;
+            }
+            foreach (KeyValuePair<string, VIPSettings> vip in configData.VIPSettings)
+            {
+                string perm = vip.Key.StartsWith($"{Name.ToLower()}.") ? vip.Key : $"{Name.ToLower()}.{vip.Key}";
+                if (permission.UserHasPermission(player.UserIDString, perm) && vip.Value is VIPSettings)
+                {
+                    DoLog($"User has VIP setting {perm}");
+                    vipsettings = vip.Value;
+                    return; // No need to keep trying
+                }
+            }
+            vipsettings = null;
         }
 
         #endregion config
