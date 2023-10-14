@@ -30,7 +30,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Toilette", "RFC1920", "1.0.4")]
+    [Info("Toilette", "RFC1920", "1.0.5")]
     [Description("Spawn a toilet!")]
     internal class Toilette : RustPlugin
     {
@@ -84,6 +84,7 @@ namespace Oxide.Plugins
 
         private object CanMountEntity(BasePlayer player, BaseMountable mountable)
         {
+            if (!configData.Options.BlockMount) return null;
             if (player == null) return null;
             if (mountable == null) return null;
             // Only toilets
@@ -100,7 +101,7 @@ namespace Oxide.Plugins
             DoLog("Managed toilet");
 
             object res = IsFriend(player.userID, mountable.net.ID.Value);
-            if (res is bool && !(bool)res && configData.Options.BlockMount)
+            if (res is bool && !(bool)res)
             {
                 // Block mount
                 DoLog("Player trying to mount someone else's toilet.");
