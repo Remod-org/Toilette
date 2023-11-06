@@ -30,7 +30,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Toilette", "RFC1920", "1.0.6")]
+    [Info("Toilette", "RFC1920", "1.0.7")]
     [Description("Spawn a toilet!")]
     internal class Toilette : RustPlugin
     {
@@ -40,6 +40,7 @@ namespace Oxide.Plugins
         private Dictionary<ulong, List<Toilet>> toilettes = new Dictionary<ulong, List<Toilet>>();
         private Dictionary<NetworkableId, ulong> toiletToOwner = new Dictionary<NetworkableId, ulong>();
         private ConfigData configData;
+        private bool enabled = false;
 
         [PluginReference]
         private readonly Plugin Friends, Clans, RustIO;
@@ -71,7 +72,7 @@ namespace Oxide.Plugins
             }
 
             LoadData();
-            RespawnToilets();
+            enabled = true;
         }
 
         #region Message
@@ -91,12 +92,12 @@ namespace Oxide.Plugins
             }, this);
         }
 
-        private void Unload() => KillToilets();
-
         private object CanMountEntity(BasePlayer player, BaseMountable mountable)
         {
+            if (!enabled) return null;
             if (!configData.Options.BlockMount) return null;
             if (player == null) return null;
+            if (!player.userID.IsSteamId()) return null;
             if (mountable == null) return null;
             // Only toilets
             if (!mountable.ShortPrefabName.Equals("toilet_a.static") && !mountable.ShortPrefabName.Equals("toilet_b.static")) return null;
@@ -122,28 +123,6 @@ namespace Oxide.Plugins
             return null;
         }
 
-        private void RespawnToilets()
-        {
-            foreach (KeyValuePair<ulong, List<Toilet>> toilets in new Dictionary<ulong, List<Toilet>>(toilettes))
-            {
-                foreach (Toilet toilet in toilets.Value)
-                {
-                    GameObject prefab = SpawnPrefab(toilet.prefab, toilet.position, toilet.rotation, true);
-                    if (prefab == null) continue;
-                    BaseEntity entity = prefab?.GetComponent<BaseEntity>();
-                    entity?.Spawn();
-                    entity.OwnerID = toilets.Key;
-
-                    // Update with new net.ID
-                    Toilet find = toilettes[toilets.Key].First(x => x.Id == toilet.Id);
-                    if (find != null) find.Id = entity.net.ID;
-
-                    toiletToOwner.Add(entity.net.ID, toilet.OwnerId);
-                }
-            }
-            SaveData();
-        }
-
         private void KillToilets(bool all = false, ulong userid = 0)
         {
             foreach (KeyValuePair<ulong, List<Toilet>> toilets in new Dictionary<ulong, List<Toilet>>(toilettes))
@@ -160,7 +139,9 @@ namespace Oxide.Plugins
                         find.position = t.transform.position;
                         find.rotation = t.transform.rotation;
                     }
-                    t.Kill();
+                    DoLog($"Killing toilet {t.net.ID.Value} owned by {find.OwnerId}");
+                    UnityEngine.Object.Destroy(t?.gameObject);
+                    t?.Kill();
                     toiletToOwner.Remove(toilet.Id);
                 }
             }
@@ -209,7 +190,8 @@ namespace Oxide.Plugins
                 }
 
                 if (!friend && !player.IsAdmin) return;
-                target.Kill();
+                UnityEngine.Object.Destroy(target?.gameObject);
+                target?.Kill();
                 toilettes[player.userID].Remove(find);
                 SaveData();
                 return;
@@ -444,6 +426,11 @@ namespace Oxide.Plugins
         #endregion config
         private object IsFriend(ulong playerid, ulong ownerid)
         {
+            if (!configData.Options.useFriends && !configData.Options.useClans && !configData.Options.useTeams)
+            {
+                return null;
+            }
+            if (playerid == ownerid) return true;
             if (configData.Options.useFriends && Friends != null)
             {
                 object fr = Friends?.CallHook("AreFriends", playerid, ownerid);
