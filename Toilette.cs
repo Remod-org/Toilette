@@ -1,4 +1,4 @@
-﻿#region License (GPL v2)
+#region License (GPL v2)
 /*
     Toilet spawner
     Copyright (c) RFC1920 <desolationoutpostpve@gmail.com>
@@ -30,7 +30,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("Toilette", "RFC1920", "1.0.7")]
+    [Info("Toilette", "RFC1920", "1.0.8")]
     [Description("Spawn a toilet!")]
     internal class Toilette : RustPlugin
     {
@@ -40,7 +40,7 @@ namespace Oxide.Plugins
         private Dictionary<ulong, List<Toilet>> toilettes = new Dictionary<ulong, List<Toilet>>();
         private Dictionary<NetworkableId, ulong> toiletToOwner = new Dictionary<NetworkableId, ulong>();
         private ConfigData configData;
-        private bool enabled = false;
+        private bool enabled;
 
         [PluginReference]
         private readonly Plugin Friends, Clans, RustIO;
@@ -404,12 +404,14 @@ namespace Oxide.Plugins
 
         private void GetVIPSettings(BasePlayer player, out VIPSettings vipsettings)
         {
+            vipsettings = null;
             if (player?.userID.IsSteamId() != true)
             {
                 DoLog("User has no VIP settings");
-                vipsettings = null;
                 return;
             }
+            if (configData.VIPSettings == null) return;
+
             foreach (KeyValuePair<string, VIPSettings> vip in configData.VIPSettings)
             {
                 string perm = vip.Key.StartsWith($"{Name.ToLower()}.") ? vip.Key : $"{Name.ToLower()}.{vip.Key}";
@@ -420,7 +422,6 @@ namespace Oxide.Plugins
                     return; // No need to keep trying
                 }
             }
-            vipsettings = null;
         }
 
         #endregion config
@@ -471,7 +472,7 @@ namespace Oxide.Plugins
         private void LoadData()
         {
             toilettes = Interface.Oxide.DataFileSystem.ReadObject<Dictionary<ulong, List<Toilet>>>(Name + "/toilettes");
-            foreach (KeyValuePair<ulong, List<Toilet>> toi  in toilettes)
+            foreach (KeyValuePair<ulong, List<Toilet>> toi in toilettes)
             {
                 foreach (Toilet toilet in toi.Value)
                 {
